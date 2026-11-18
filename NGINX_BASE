@@ -1,1 +1,1 @@
-localhost:5001/ingress-nginx/nginx:v2.3.0-union.1
+public.ecr.aws/unionai/ingress-nginx/nginx:v1.31.9-union.1
