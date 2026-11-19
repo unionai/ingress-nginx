@@ -112,5 +112,11 @@ echo "[dev-env] copying docker images to cluster..."
 
 kind load docker-image --name="${KIND_CLUSTER_NAME}" --nodes="${KIND_WORKERS}" nginx-ingress-controller:e2e
 kind load docker-image --name="${KIND_CLUSTER_NAME}" --nodes="${KIND_WORKERS}" "${REGISTRY}"/controller:"${TAG}"
+# The e2e backends run from NGINX_BASE; load it when it was built locally, as
+# a new base image is not in a registry yet.
+NGINX_BASE_TAG="${NGINX_BASE_IMAGE%@*}"
+if docker image inspect "${NGINX_BASE_TAG}" >/dev/null 2>&1; then
+  kind load docker-image --name="${KIND_CLUSTER_NAME}" --nodes="${KIND_WORKERS}" "${NGINX_BASE_TAG}"
+fi
 echo "[dev-env] running e2e tests..."
 make -C "${DIR}"/../../ e2e-test

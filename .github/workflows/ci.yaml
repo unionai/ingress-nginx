@@ -164,8 +164,10 @@ jobs:
         if: |
           needs.changes.outputs.baseimage == 'true'
         run: |
-            export TAG=$(cat images/nginx/TAG)
-            cd images/nginx/rootfs && docker buildx build --platform=${{ env.PLATFORMS }} --load -t registry.k8s.io/ingress-nginx/nginx:${TAG} .
+            # Tag it as NGINX_BASE (without any digest): the controller is built
+            # on it, and the e2e suite runs its test backends from it.
+            export NGINX_BASE=$(cut -d@ -f1 NGINX_BASE)
+            cd images/nginx/rootfs && docker buildx build --platform=${{ env.PLATFORMS }} --load -t "${NGINX_BASE}" .
 
       - name: Build images
         env:
@@ -174,16 +176,17 @@ jobs:
           REGISTRY: ingress-controller
         run: |
           echo "building images..."
-          export TAGNGINX=$(cat images/nginx/TAG)
-          make BASE_IMAGE=registry.k8s.io/ingress-nginx/nginx:${TAGNGINX} clean-image build image image-chroot
+          export NGINX_BASE=$(cut -d@ -f1 NGINX_BASE)
+          make BASE_IMAGE="${NGINX_BASE}" clean-image build image image-chroot
           make -C test/e2e-image image
 
           echo "creating images cache..."
-          docker save \
-            nginx-ingress-controller:e2e \
-            ingress-controller/controller:1.0.0-dev \
-            ingress-controller/controller-chroot:1.0.0-dev \
-            | gzip > docker.tar.gz
+          images="nginx-ingress-controller:e2e ingress-controller/controller:1.0.0-dev ingress-controller/controller-chroot:1.0.0-dev"
+          # A base image built above may not be published yet; carry it to the e2e jobs.
+          if [ "${{ needs.changes.outputs.baseimage }}" = "true" ]; then
+            images="${images} ${NGINX_BASE}"
+          fi
+          docker save ${images} | gzip > docker.tar.gz
 
       - name: cache
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
